@@ -1,37 +1,175 @@
-version: '3.8'
+version: "3.8"
+
 services:
+ 
+  user-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: userservice
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  template-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: templates_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - template_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  template-redis:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway-redis:
+    image: redis:7-alpine
+    ports:
+      - "6382:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  push-redis:
+    image: redis:7-alpine
+    ports:
+      - "6383:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   user-service:
     image: docker.io/0xcypheron/user-service:latest
     env_file: .env
     ports:
       - "8000:8000"
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+      user-redis:
+        condition: service_healthy
+
   templates-service:
     image: docker.io/0xcypheron/templates-service:latest
     env_file: .env
     ports:
       - "8080:8080"
+    depends_on:
+      template-postgres:
+        condition: service_healthy
+      template-redis:
+        condition: service_healthy
+
   api-gateway:
-    image: docker.io/0xcypheron/api-gateway:latest
+    image: docker.io/0xcypheron/api-gateway-service:latest
     env_file: .env
     ports:
       - "8090:8090"
+    depends_on:
+      user-service:
+        condition: service_started
+      templates-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      api-gateway-redis:
+        condition: service_healthy
+
   push-service:
     image: docker.io/0xcypheron/push-service:latest
     env_file: .env
     ports:
       - "8500:8500"
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    ports:
-      - '5672:5672'
-      - '15672:15672'
+    volumes:
+      - ./push-service/firebase_credentials.json:/app/firebase_credentials.json:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      push-redis:
+        condition: service_healthy
+
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - user-service
+      - templates-service
+      - api-gateway
+      - push-service
+
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin-change-in-production
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  user_postgres_data:
+  template_postgres_data:
+  prometheus_data:
+  grafana_data:
