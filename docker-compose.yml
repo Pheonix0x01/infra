@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  user-service:
+    image: docker.io/0xcypheron/user-service:latest
+    env_file: .env
+    ports:
+      - "8000:8000"
+  templates-service:
+    image: docker.io/0xcypheron/templates-service:latest
+    env_file: .env
+    ports:
+      - "8080:8080"
+  api-gateway:
+    image: docker.io/0xcypheron/api-gateway:latest
+    env_file: .env
+    ports:
+      - "8090:8090"
+  push-service:
+    image: docker.io/0xcypheron/push-service:latest
+    env_file: .env
+    ports:
+      - "8500:8500"
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
