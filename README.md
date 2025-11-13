@@ -21,9 +21,14 @@ https://github.com/Belladihno/email_service
 ### api gateway url: http://172.236.16.244:8090
 
 
-system diagrams below:
+### system diagrams below:
 
-tba
+
+
+
+
+<img width="720" height="525" alt="image" src="https://github.com/user-attachments/assets/42f30281-85b3-4521-af13-6bddbd1c5b04" />
+
 
 ### observability with prometheus and grafana
 
